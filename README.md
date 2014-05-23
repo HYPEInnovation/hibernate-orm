@@ -69,3 +69,10 @@ To execute a task in a specific module you can either:
 * _eclipse_ - Generates an Eclipse project
 * _idea_ - Generates an IntelliJ/IDEA project.
 * _clean_ - Cleans the build directory
+
+HYPE Notes
+----------
+
+This for serves the purpose of backporting infinispan 6.0 support to hibernate 4.2.
+
+
