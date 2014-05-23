@@ -23,28 +23,15 @@
  */
 package org.hibernate.test.cache.infinispan.collection;
 
-import java.util.concurrent.Callable;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
-import java.util.concurrent.TimeUnit;
-import javax.transaction.TransactionManager;
+import java.util.concurrent.*;
 
-import junit.framework.AssertionFailedError;
-import org.hibernate.cache.infinispan.util.Caches;
-import org.infinispan.test.CacheManagerCallable;
-import org.infinispan.test.fwk.TestCacheManagerFactory;
-import org.infinispan.transaction.tm.BatchModeTransactionManager;
-import org.jboss.logging.Logger;
-import org.junit.After;
-import org.junit.Before;
-import org.junit.Test;
+import javax.transaction.TransactionManager;
 
 import org.hibernate.cache.infinispan.InfinispanRegionFactory;
 import org.hibernate.cache.infinispan.access.PutFromLoadValidator;
 import org.hibernate.cache.infinispan.access.TransactionalAccessDelegate;
 import org.hibernate.cache.infinispan.collection.CollectionRegionImpl;
+import org.hibernate.cache.infinispan.util.Caches;
 import org.hibernate.cache.internal.CacheDataDescriptionImpl;
 import org.hibernate.cache.spi.CacheDataDescription;
 import org.hibernate.cache.spi.access.AccessType;
@@ -54,7 +41,15 @@ import org.hibernate.internal.util.compare.ComparableComparator;
 import org.hibernate.test.cache.infinispan.AbstractNonFunctionalTestCase;
 import org.hibernate.test.cache.infinispan.NodeEnvironment;
 import org.hibernate.test.cache.infinispan.util.CacheTestUtil;
+import org.infinispan.test.CacheManagerCallable;
+import org.infinispan.test.fwk.TestCacheManagerFactory;
+import org.infinispan.transaction.tm.BatchModeTransactionManager;
+import org.jboss.logging.Logger;
+import org.junit.After;
+import org.junit.Before;
+import org.junit.Test;
 
+import junit.framework.AssertionFailedError;
 import static org.infinispan.test.TestingUtil.withCacheManager;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
@@ -164,26 +159,25 @@ public abstract class AbstractCollectionRegionAccessStrategyTestCase extends Abs
 		final CountDownLatch pferLatch = new CountDownLatch( 1 );
 		final CountDownLatch removeLatch = new CountDownLatch( 1 );
       final TransactionManager remoteTm = remoteCollectionRegion.getTransactionManager();
-      withCacheManager(new CacheManagerCallable(
-            TestCacheManagerFactory.createLocalCacheManager(false)) {
+      withCacheManager(new CacheManagerCallable(TestCacheManagerFactory.createCacheManager(false)) {
          @Override
          public void call() {
-            PutFromLoadValidator validator = new PutFromLoadValidator(
-                  cm, remoteTm, 20000) {
+            PutFromLoadValidator validator = new PutFromLoadValidator(cm,
+                  remoteTm, 20000) {
                @Override
                public boolean acquirePutFromLoadLock(Object key) {
-                  boolean acquired = super.acquirePutFromLoadLock(key);
+                  boolean acquired = super.acquirePutFromLoadLock( key );
                   try {
                      removeLatch.countDown();
-                     pferLatch.await(2, TimeUnit.SECONDS);
+                     pferLatch.await( 2, TimeUnit.SECONDS );
                   }
                   catch (InterruptedException e) {
-                     log.debug("Interrupted");
+                     log.debug( "Interrupted" );
                      Thread.currentThread().interrupt();
                   }
                   catch (Exception e) {
-                     log.error("Error", e);
-                     throw new RuntimeException("Error", e);
+                     log.error( "Error", e );
+                     throw new RuntimeException( "Error", e );
                   }
                   return acquired;
                }
@@ -195,7 +189,7 @@ public abstract class AbstractCollectionRegionAccessStrategyTestCase extends Abs
 
             Callable<Void> pferCallable = new Callable<Void>() {
                public Void call() throws Exception {
-                  delegate.putFromLoad("k1", "v1", 0, null);
+                  delegate.putFromLoad( "k1", "v1", 0, null );
                   return null;
                }
             };
@@ -216,8 +210,8 @@ public abstract class AbstractCollectionRegionAccessStrategyTestCase extends Abs
             };
 
             ExecutorService executorService = Executors.newCachedThreadPool();
-            Future<Void> pferFuture = executorService.submit(pferCallable);
-            Future<Void> removeFuture = executorService.submit(removeCallable);
+            Future<Void> pferFuture = executorService.submit( pferCallable );
+            Future<Void> removeFuture = executorService.submit( removeCallable );
 
             try {
                pferFuture.get();

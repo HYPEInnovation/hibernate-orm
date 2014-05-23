@@ -25,10 +25,11 @@ import java.util.HashSet;
 import java.util.Locale;
 import java.util.Set;
 
-import org.infinispan.config.Configuration;
-import org.infinispan.eviction.EvictionStrategy;
-
 import org.hibernate.cache.CacheException;
+
+import org.infinispan.configuration.cache.Configuration;
+import org.infinispan.configuration.cache.ConfigurationBuilder;
+import org.infinispan.eviction.EvictionStrategy;
 
 /**
  * This class represents Infinispan cache parameters that can be configured via hibernate configuration properties 
@@ -68,6 +69,12 @@ public class TypeOverrides {
       return evictionStrategy;
    }
 
+   /**
+    * Sets eviction strategy for cached type.
+    *
+    * @param evictionStrategy String defining eviction strategy allowed.
+    *                         Possible values are defined in {@link EvictionStrategy}
+    */
    public void setEvictionStrategy(String evictionStrategy) {
       markAsOverriden("evictionStrategy");
       this.evictionStrategy = EvictionStrategy.valueOf(uc(evictionStrategy));
@@ -77,6 +84,13 @@ public class TypeOverrides {
       return evictionWakeUpInterval;
    }
 
+   /**
+    * Sets how often eviction process should be run for the cached type.
+    *
+    * @param evictionWakeUpInterval long representing the frequency for executing
+    *                               the eviction process, in milliseconds
+    *
+    */
    public void setEvictionWakeUpInterval(long evictionWakeUpInterval) {
       markAsOverriden("evictionWakeUpInterval");
       this.evictionWakeUpInterval = evictionWakeUpInterval;
@@ -86,6 +100,14 @@ public class TypeOverrides {
       return evictionMaxEntries;
    }
 
+   /**
+    * Maximum number of entries in a cache for this cached type. Cache size
+    * is guaranteed  not to exceed upper limit specified by max entries.
+    * However, due to the nature of eviction it is unlikely to ever be
+    * exactly maximum number of entries specified here.
+    *
+    * @param evictionMaxEntries number of maximum cache entries
+    */
    public void setEvictionMaxEntries(int evictionMaxEntries) {
       markAsOverriden("evictionMaxEntries");
       this.evictionMaxEntries = evictionMaxEntries;
@@ -95,6 +117,14 @@ public class TypeOverrides {
       return expirationLifespan;
    }
 
+   /**
+    * Maximum lifespan of a cache entry, after which the entry is expired
+    * cluster-wide, in milliseconds. -1 means the entries never expire.
+    *
+    * @param expirationLifespan long representing the maximum lifespan,
+    *                           in milliseconds, for a cached entry before
+    *                           it's expired
+    */
    public void setExpirationLifespan(long expirationLifespan) {
       markAsOverriden("expirationLifespan");
       this.expirationLifespan = expirationLifespan;
@@ -104,6 +134,15 @@ public class TypeOverrides {
       return expirationMaxIdle;
    }
 
+   /**
+    * Maximum idle time a cache entry will be maintained in the cache, in
+    * milliseconds. If the idle time is exceeded, the entry will be expired
+    * cluster-wide. -1 means the entries never expire.
+    *
+    * @param expirationMaxIdle long representing the maximum idle time, in
+    *                          milliseconds, for a cached entry before it's
+    *                          expired
+    */
    public void setExpirationMaxIdle(long expirationMaxIdle) {
       markAsOverriden("expirationMaxIdle");
       this.expirationMaxIdle = expirationMaxIdle;
@@ -113,42 +152,65 @@ public class TypeOverrides {
       return isExposeStatistics;
    }
 
+   /**
+    * Enable statistics gathering and reporting via JMX.
+    *
+    * @param isExposeStatistics boolean indicating whether statistics should
+    *                           be enabled or disabled
+    */
    public void setExposeStatistics(boolean isExposeStatistics) {
       markAsOverriden("isExposeStatistics");
       this.isExposeStatistics = isExposeStatistics;
    }
 
-   public Configuration createInfinispanConfiguration() {
-      Configuration cacheCfg = new Configuration();
-      if (overridden.contains("evictionStrategy"))
-         cacheCfg.fluent().eviction().strategy(evictionStrategy);
-      if (overridden.contains("evictionWakeUpInterval"))
-         cacheCfg.fluent().expiration().wakeUpInterval(evictionWakeUpInterval);
-      if (overridden.contains("evictionMaxEntries"))
-         cacheCfg.fluent().eviction().maxEntries(evictionMaxEntries);
-      if (overridden.contains("expirationLifespan"))
-         cacheCfg.fluent().expiration().lifespan(expirationLifespan);
-      if (overridden.contains("expirationMaxIdle"))
-         cacheCfg.fluent().expiration().maxIdle(expirationMaxIdle);
-      if (overridden.contains("isExposeStatistics") && isExposeStatistics)
-         cacheCfg.fluent().jmxStatistics();
-      return cacheCfg;
+   /**
+    * Apply the configuration overrides in this {@link TypeOverrides} instance
+    * to the cache configuration builder passed as parameter.
+    *
+    * @param builder cache configuration builder on which to apply
+    *                configuration overrides
+    */
+	public void applyTo(ConfigurationBuilder builder) {
+		if ( overridden.contains( "evictionStrategy" ) ) {
+			builder.eviction().strategy( evictionStrategy );
    }
+		if ( overridden.contains( "evictionWakeUpInterval" ) ) {
+			builder.expiration().wakeUpInterval( evictionWakeUpInterval );
+		}
+		if ( overridden.contains( "evictionMaxEntries" ) ) {
+			builder.eviction().maxEntries( evictionMaxEntries );
+		}
+		if ( overridden.contains( "expirationLifespan" ) ) {
+			builder.expiration().lifespan( expirationLifespan );
+		}
+		if ( overridden.contains( "expirationMaxIdle" ) ) {
+			builder.expiration().maxIdle( expirationMaxIdle );
+		}
+		if ( overridden.contains( "isExposeStatistics" ) && isExposeStatistics ) {
+			builder.jmxStatistics().enable();
+		}
+	}
 
-   public void validateInfinispanConfiguration(Configuration configuration) throws CacheException {
-      // no-op
+   /**
+    * Validate the configuration for this cached type.
+    *
+    * @param cfg configuration to validate
+    * @throws CacheException if validation fails
+    */
+	public void validateInfinispanConfiguration(Configuration cfg) throws CacheException {
+		// no-op, method overriden
    }
 
    @Override
    public String toString() {
-      return new StringBuilder().append(getClass().getSimpleName()).append('{')
-         .append("cache=").append(cacheName)
-         .append(", strategy=").append(evictionStrategy)
-         .append(", wakeUpInterval=").append(evictionWakeUpInterval)
-         .append(", maxEntries=").append(evictionMaxEntries)
-         .append(", lifespan=").append(expirationLifespan)
-         .append(", maxIdle=").append(expirationMaxIdle)
-         .append('}').toString();
+		return getClass().getSimpleName()
+				+ '{' + "cache=" + cacheName
+				+ ", strategy=" + evictionStrategy
+				+ ", wakeUpInterval=" + evictionWakeUpInterval
+				+ ", maxEntries=" + evictionMaxEntries
+				+ ", lifespan=" + expirationLifespan
+				+ ", maxIdle=" + expirationMaxIdle
+				+ '}';
    }
 
    private String uc(String s) {

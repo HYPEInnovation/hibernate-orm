@@ -23,31 +23,12 @@
  */
 package org.hibernate.test.cache.infinispan.tm;
 
-import java.sql.Connection;
-import java.sql.SQLException;
 import java.util.Iterator;
 import java.util.Properties;
-import javax.naming.Context;
-import javax.naming.InitialContext;
-import javax.naming.Name;
-import javax.naming.NameNotFoundException;
-import javax.naming.Reference;
-import javax.naming.StringRefAddr;
-import javax.transaction.Status;
-import javax.transaction.TransactionManager;
-import javax.transaction.UserTransaction;
 
-import org.enhydra.jdbc.standard.StandardXADataSource;
-import org.infinispan.transaction.lookup.JBossStandaloneJTAManagerLookup;
-import org.infinispan.util.logging.Log;
-import org.infinispan.util.logging.LogFactory;
-import org.jboss.util.naming.NonSerializableFactory;
-import org.jnp.interfaces.NamingContext;
-import org.jnp.server.Main;
-import org.jnp.server.NamingServer;
-import org.junit.After;
-import org.junit.Before;
-import org.junit.Test;
+import javax.naming.*;
+import javax.transaction.Status;
+import javax.transaction.UserTransaction;
 
 import org.hibernate.Session;
 import org.hibernate.SessionFactory;
@@ -61,6 +42,18 @@ import org.hibernate.service.jta.platform.internal.JBossStandAloneJtaPlatform;
 import org.hibernate.stat.Statistics;
 import org.hibernate.test.cache.infinispan.functional.Item;
 import org.hibernate.testing.ServiceRegistryBuilder;
+import org.hibernate.testing.jta.JtaAwareConnectionProviderImpl;
+import org.infinispan.configuration.cache.ConfigurationBuilder;
+import org.infinispan.transaction.lookup.JBossStandaloneJTAManagerLookup;
+import org.infinispan.util.logging.Log;
+import org.infinispan.util.logging.LogFactory;
+import org.jboss.util.naming.NonSerializableFactory;
+import org.jnp.interfaces.NamingContext;
+import org.jnp.server.Main;
+import org.jnp.server.NamingServer;
+import org.junit.After;
+import org.junit.Before;
+import org.junit.Test;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNull;
@@ -87,15 +80,16 @@ public class JBossStandaloneJtaExampleTest {
       jndiServer = startJndiServer();
       ctx = createJndiContext();
       // Inject configuration to initialise transaction manager from config classloader
-      lookup.init(new org.infinispan.config.Configuration());
+      lookup.init(new ConfigurationBuilder().build());
       bindTransactionManager();
       bindUserTransaction();
-      bindDataSource();
    }
 
    @After
    public void tearDown() throws Exception {
       try {
+         unbind("UserTransaction", ctx);
+         unbind("java:/TransactionManager", ctx);
          ctx.close();
          jndiServer.stop();
 	  }
@@ -177,37 +171,6 @@ public class JBossStandaloneJtaExampleTest {
 
    }
 
-   public static class ExtendedXADataSource extends StandardXADataSource { // XAPOOL
-      @Override
-      public Connection getConnection() throws SQLException {
-
-         if (getTransactionManager() == null) { // although already set before, it results null again after retrieving the datasource by jndi
-            TransactionManager tm;  // this is because the TransactionManager information is not serialized.
-            try {
-               tm = lookup.getTransactionManager();
-            } catch (Exception e) {
-               throw new SQLException(e);
-            }
-            setTransactionManager(tm);  //  resets the TransactionManager on the datasource retrieved by jndi,
-            //  this makes the datasource JTA-aware
-         }
-
-         // According to Enhydra documentation, here we must return the connection of our XAConnection
-         // see http://cvs.forge.objectweb.org/cgi-bin/viewcvs.cgi/xapool/xapool/examples/xapooldatasource/DatabaseHelper.java?sortby=rev
-         return super.getXAConnection().getConnection();
-      }
-
-      @Override
-      public <T> T unwrap(Class<T> iface) throws SQLException {
-         return null;  // JDK6 stuff
-      }
-
-      @Override
-      public boolean isWrapperFor(Class<?> iface) throws SQLException {
-         return false;  // JDK6 stuff
-      }
-   }
-
    private Main startJndiServer() throws Exception {
       // Create an in-memory jndi
       NamingServer namingServer = new NamingServer();
@@ -234,13 +197,6 @@ public class JBossStandaloneJtaExampleTest {
    private void bindUserTransaction() throws Exception {
       // also the UserTransaction must be registered on jndi: org.hibernate.engine.transaction.internal.jta.JtaTransactionFactory#getUserTransaction() requires this
       bind("UserTransaction", lookup.getUserTransaction(), lookup.getUserTransaction().getClass(), ctx);
-   }
-
-   private void bindDataSource() throws Exception {
-      ExtendedXADataSource xads = new ExtendedXADataSource();
-      xads.setDriverName("org.h2.Driver");
-      xads.setUrl("jdbc:h2:mem:db1;DB_CLOSE_DELAY=-1;MVCC=TRUE");
-      ctx.bind("java:/MyDatasource", xads);
    }
 
    /**
@@ -282,17 +238,17 @@ public class JBossStandaloneJtaExampleTest {
    private SessionFactory buildSessionFactory() {
       // Extra options located in src/test/resources/hibernate.properties
       Configuration cfg = new Configuration();
-      cfg.setProperty(Environment.DIALECT, "org.hibernate.dialect.HSQLDialect");
-      cfg.setProperty(Environment.HBM2DDL_AUTO, "create-drop");
-      cfg.setProperty(Environment.DATASOURCE, "java:/MyDatasource");
+      cfg.setProperty( Environment.DIALECT, "HSQL" );
+      cfg.setProperty( Environment.HBM2DDL_AUTO, "create-drop" );
+      cfg.setProperty( Environment.CONNECTION_PROVIDER, JtaAwareConnectionProviderImpl.class.getName() );
       cfg.setProperty(Environment.JNDI_CLASS, "org.jnp.interfaces.NamingContextFactory");
-      cfg.setProperty(Environment.TRANSACTION_MANAGER_STRATEGY, "org.hibernate.transaction.JBossTransactionManagerLookup");
-      cfg.setProperty(Environment.TRANSACTION_STRATEGY, "org.hibernate.transaction.JTATransactionFactory");
+      cfg.setProperty(Environment.TRANSACTION_STRATEGY, "jta");
       cfg.setProperty(Environment.CURRENT_SESSION_CONTEXT_CLASS, "jta");
       cfg.setProperty(Environment.RELEASE_CONNECTIONS, "auto");
       cfg.setProperty(Environment.USE_SECOND_LEVEL_CACHE, "true");
       cfg.setProperty(Environment.USE_QUERY_CACHE, "true");
-      cfg.setProperty(Environment.CACHE_REGION_FACTORY, "org.hibernate.cache.infinispan.InfinispanRegionFactory");
+      cfg.setProperty(Environment.CACHE_REGION_FACTORY,
+              "org.hibernate.test.cache.infinispan.functional.SingleNodeTestCase$TestInfinispanRegionFactory");
 
       Properties envProps = Environment.getProperties();
       envProps.put(AvailableSettings.JTA_PLATFORM, new JBossStandAloneJtaPlatform());

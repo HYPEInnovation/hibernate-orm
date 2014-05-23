@@ -25,18 +25,15 @@ package org.hibernate.test.cache.infinispan;
 
 import java.util.HashMap;
 import java.util.Map;
-import java.util.concurrent.Callable;
 
 import org.hibernate.cache.infinispan.InfinispanRegionFactory;
 import org.hibernate.cache.infinispan.collection.CollectionRegionImpl;
 import org.hibernate.cache.infinispan.entity.EntityRegionImpl;
-import org.hibernate.cache.infinispan.util.Caches;
 import org.hibernate.cache.spi.CacheDataDescription;
 import org.hibernate.cfg.Configuration;
 import org.hibernate.service.ServiceRegistryBuilder;
 import org.hibernate.service.internal.StandardServiceRegistryImpl;
 import org.hibernate.test.cache.infinispan.util.CacheTestUtil;
-import org.infinispan.context.Flag;
 
 /**
  * Defines the environment for a node.
@@ -117,38 +114,39 @@ public class NodeEnvironment {
 	}
 
 	public void release() throws Exception {
+      try {
 		if ( entityRegionMap != null ) {
-			for ( final EntityRegionImpl region : entityRegionMap.values() ) {
-				Caches.withinTx(region.getTransactionManager(), new Callable<Void>() {
-               @Override
-               public Void call() throws Exception {
-                  region.getCache().withFlags(Flag.CACHE_MODE_LOCAL).clear();
-                  return null;
-               }
-            });
+            for (EntityRegionImpl region : entityRegionMap.values()) {
+               try {
 				region.getCache().stop();
+               } catch (Exception e) {
+                  // Ignore...
 			}
+            }
 			entityRegionMap.clear();
 		}
 		if ( collectionRegionMap != null ) {
-			for ( final CollectionRegionImpl collectionRegion : collectionRegionMap.values() ) {
-            Caches.withinTx(collectionRegion.getTransactionManager(), new Callable<Void>() {
-               @Override
-               public Void call() throws Exception {
-                  collectionRegion.getCache().withFlags(Flag.CACHE_MODE_LOCAL).clear();
-                  return null;
+            for (CollectionRegionImpl reg : collectionRegionMap.values()) {
+               try {
+                  reg.getCache().stop();
+               } catch (Exception e) {
+                  // Ignore...
                }
-            });
-				collectionRegion.getCache().stop();
 			}
 			collectionRegionMap.clear();
 		}
+      } finally {
+         try {
 		if ( regionFactory != null ) {
-// Currently the RegionFactory is shutdown by its registration with the CacheTestSetup from CacheTestUtil when built
+               // Currently the RegionFactory is shutdown by its registration
+               // with the CacheTestSetup from CacheTestUtil when built
 			regionFactory.stop();
 		}
+         } finally {
 		if ( serviceRegistry != null ) {
 			serviceRegistry.destroy();
+            }
+         }
 		}
 	}
 }

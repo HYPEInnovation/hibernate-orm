@@ -25,22 +25,7 @@ package org.hibernate.test.cache.infinispan.timestamp;
 
 import java.util.Properties;
 
-import org.infinispan.AdvancedCache;
-import org.infinispan.context.Flag;
-import org.infinispan.notifications.Listener;
-import org.infinispan.notifications.cachelistener.annotation.CacheEntryActivated;
-import org.infinispan.notifications.cachelistener.annotation.CacheEntryCreated;
-import org.infinispan.notifications.cachelistener.annotation.CacheEntryEvicted;
-import org.infinispan.notifications.cachelistener.annotation.CacheEntryInvalidated;
-import org.infinispan.notifications.cachelistener.annotation.CacheEntryLoaded;
-import org.infinispan.notifications.cachelistener.annotation.CacheEntryModified;
-import org.infinispan.notifications.cachelistener.annotation.CacheEntryPassivated;
-import org.infinispan.notifications.cachelistener.annotation.CacheEntryRemoved;
-import org.infinispan.notifications.cachelistener.annotation.CacheEntryVisited;
-import org.infinispan.notifications.cachelistener.event.Event;
-
 import org.hibernate.cache.infinispan.InfinispanRegionFactory;
-import org.hibernate.test.cache.infinispan.util.ClassLoaderAwareCache;
 import org.hibernate.cache.infinispan.timestamp.TimestampsRegionImpl;
 import org.hibernate.cache.spi.CacheDataDescription;
 import org.hibernate.cache.spi.Region;
@@ -48,10 +33,17 @@ import org.hibernate.cache.spi.UpdateTimestampsCache;
 import org.hibernate.cfg.Configuration;
 import org.hibernate.service.ServiceRegistryBuilder;
 import org.hibernate.test.cache.infinispan.AbstractGeneralDataRegionTestCase;
+import org.hibernate.test.cache.infinispan.functional.SingleNodeTestCase;
 import org.hibernate.test.cache.infinispan.functional.classloader.Account;
 import org.hibernate.test.cache.infinispan.functional.classloader.AccountHolder;
 import org.hibernate.test.cache.infinispan.functional.classloader.SelectedClassnameClassLoader;
 import org.hibernate.test.cache.infinispan.util.CacheTestUtil;
+import org.hibernate.test.cache.infinispan.util.ClassLoaderAwareCache;
+import org.infinispan.AdvancedCache;
+import org.infinispan.context.Flag;
+import org.infinispan.notifications.Listener;
+import org.infinispan.notifications.cachelistener.annotation.*;
+import org.infinispan.notifications.cachelistener.event.Event;
 
 /**
  * Tests of TimestampsRegionImpl.
@@ -123,13 +115,9 @@ public class TimestampsRegionImplTestCase extends AbstractGeneralDataRegionTestC
       return CacheTestUtil.buildConfiguration("test", MockInfinispanRegionFactory.class, false, true);
    }
 
-   public static class MockInfinispanRegionFactory extends InfinispanRegionFactory {
+   public static class MockInfinispanRegionFactory extends SingleNodeTestCase.TestInfinispanRegionFactory {
 
       public MockInfinispanRegionFactory() {
-      }
-
-      public MockInfinispanRegionFactory(Properties props) {
-         super(props);
       }
 
 //      @Override
@@ -146,19 +134,6 @@ public class TimestampsRegionImplTestCase extends AbstractGeneralDataRegionTestC
             }
          };
       }
-
-      //      @Override
-//      protected EmbeddedCacheManager createCacheManager(Properties properties) throws CacheException {
-//         try {
-//            EmbeddedCacheManager manager = new DefaultCacheManager(InfinispanRegionFactory.DEF_INFINISPAN_CONFIG_RESOURCE);
-//            org.infinispan.config.Configuration ispnCfg = new org.infinispan.config.Configuration();
-//            ispnCfg.setCacheMode(org.infinispan.config.Configuration.CacheMode.REPL_SYNC);
-//            manager.defineConfiguration("timestamps", ispnCfg);
-//            return manager;
-//         } catch (IOException e) {
-//            throw new CacheException("Unable to create default cache manager", e);
-//         }
-//      }
 
       @Listener      
       public static class MockClassLoaderAwareListener extends ClassLoaderAwareCache.ClassLoaderAwareListener {

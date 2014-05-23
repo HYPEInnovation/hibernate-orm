@@ -28,17 +28,8 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 
-import junit.framework.AssertionFailedError;
-import org.hibernate.cache.infinispan.util.Caches;
-import org.infinispan.AdvancedCache;
-import org.infinispan.notifications.Listener;
-import org.infinispan.notifications.cachelistener.annotation.CacheEntryVisited;
-import org.infinispan.notifications.cachelistener.event.CacheEntryVisitedEvent;
-import org.infinispan.transaction.tm.BatchModeTransactionManager;
-import org.infinispan.util.concurrent.IsolationLevel;
-import org.jboss.logging.Logger;
-
 import org.hibernate.cache.infinispan.InfinispanRegionFactory;
+import org.hibernate.cache.infinispan.util.Caches;
 import org.hibernate.cache.internal.StandardQueryCache;
 import org.hibernate.cache.spi.CacheDataDescription;
 import org.hibernate.cache.spi.GeneralDataRegion;
@@ -48,7 +39,15 @@ import org.hibernate.cfg.Configuration;
 import org.hibernate.service.ServiceRegistryBuilder;
 import org.hibernate.test.cache.infinispan.AbstractGeneralDataRegionTestCase;
 import org.hibernate.test.cache.infinispan.util.CacheTestUtil;
+import org.infinispan.AdvancedCache;
+import org.infinispan.notifications.Listener;
+import org.infinispan.notifications.cachelistener.annotation.CacheEntryVisited;
+import org.infinispan.notifications.cachelistener.event.CacheEntryVisitedEvent;
+import org.infinispan.transaction.tm.BatchModeTransactionManager;
+import org.infinispan.util.concurrent.IsolationLevel;
+import org.jboss.logging.Logger;
 
+import junit.framework.AssertionFailedError;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
@@ -295,7 +294,7 @@ public class QueryRegionImplTestCase extends AbstractGeneralDataRegionTestCase {
 			blockerLatch.countDown();
 			unblocked = true;
 
-			if ( IsolationLevel.REPEATABLE_READ.equals( jbc.getConfiguration().getIsolationLevel() ) ) {
+			if ( IsolationLevel.REPEATABLE_READ.equals( jbc.getCacheConfiguration().locking().isolationLevel() ) ) {
 				assertEquals( VALUE1, region.get( KEY ) );
 			}
 			else {
