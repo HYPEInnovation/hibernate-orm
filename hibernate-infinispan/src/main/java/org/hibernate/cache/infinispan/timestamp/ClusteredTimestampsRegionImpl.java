@@ -169,4 +169,13 @@ public class ClusteredTimestampsRegionImpl extends TimestampsRegionImpl {
 		localCache.remove( event.getKey() );
 	}
 
+	@Override
+	public void put(final Object key, final Object value) throws CacheException {
+		//Override super method and update local cache first. This may cause a lower cache hit rate in the query cache
+		//but ensures consistency in clustered mode as in that case, updates may take too long when the primary owner of
+		//the cache segment is not the local process. In this case, the update will go to the primary owner first who'll
+		//then distribute it to all cluster members. This, however, can be too slow for in-transaction read-after-write
+		localCache.put(key, value);
+		super.put(key, value);
+	}
 }
